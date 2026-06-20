@@ -1,0 +1,6 @@
+{
+  "name": "Yapay Zekâ Destekli Orman Yangını Erken Uyarı, Tahmin ve Müdahale Sistemi",
+  "description": "Yapay zekâ destekli orman yangını erken uyarı, risk tahmini, yayılım simülasyonu ve acil durum müdahale planlama sistemi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
