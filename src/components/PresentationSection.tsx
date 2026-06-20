@@ -41,12 +41,17 @@ interface UploadedFile {
   size: string;
   slideCount: number;
   uploadedAt: string;
+  presentationUrl?: string;
 }
 
 export default function PresentationSection() {
   const [activeFileId, setActiveFileId] = useState<string>("file_init");
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  
+  // URL Input states for loading presentation URLs directly
+  const [urlInput, setUrlInput] = useState("");
+  const [urlNameInput, setUrlNameInput] = useState("");
   
   // Slide list initialized in local React state so it can be appended dynamically!
   const [slides, setSlides] = useState<Slide[]>([
@@ -147,8 +152,91 @@ export default function PresentationSection() {
       size: "4.8 KB",
       slideCount: 5,
       uploadedAt: "Sistem Başlangıcı"
+    },
+    {
+      id: "file_gs_demo",
+      name: "Örnek Canlı Google Slides Şablonu",
+      size: "Bulut Bağlantısı",
+      slideCount: 15,
+      uploadedAt: "Canlı",
+      presentationUrl: "https://docs.google.com/presentation/d/e/2PACX-1vT3oJ9jshvscY8L0w8gA9-h2E9_bS_z2Mv7U_cQ-C7W2S4A3D7p7_v7PTo5B6N_A0zN_pXq6G7S2G5_/embed?start=false&loop=false&delayms=3000"
     }
   ]);
+
+  // Helper to format pasted presentation URLs for secure responsive embedding
+  const formatPresentationUrl = (url: string): string => {
+    if (!url) return "";
+    let cleanUrl = url.trim();
+
+    // Force Google Slides of form edit / pub to /embed
+    if (cleanUrl.includes("docs.google.com/presentation")) {
+      if (cleanUrl.includes("/edit")) {
+        cleanUrl = cleanUrl.split("/edit")[0] + "/embed";
+      } else if (cleanUrl.includes("/pub")) {
+        cleanUrl = cleanUrl.split("/pub")[0] + "/embed";
+      } else if (!cleanUrl.endsWith("/embed")) {
+        const lastSlashIndex = cleanUrl.lastIndexOf("/");
+        const lastPart = cleanUrl.substring(lastSlashIndex);
+        if (!lastPart.includes("embed") && !lastPart.includes("pub") && !lastPart.includes("edit")) {
+          if (cleanUrl.endsWith("/")) {
+            cleanUrl = cleanUrl + "embed";
+          } else {
+            cleanUrl = cleanUrl + "/embed";
+          }
+        }
+      }
+      if (!cleanUrl.includes("?")) {
+        cleanUrl += "?start=false&loop=false&delayms=3000";
+      }
+      return cleanUrl;
+    }
+
+    // Direct PPTX or PDF URLs embedded with Microsoft Office Web Viewer
+    const lowerUrl = cleanUrl.toLowerCase();
+    if (lowerUrl.endsWith(".pptx") || lowerUrl.endsWith(".ppt") || lowerUrl.endsWith(".pdf")) {
+      if (!lowerUrl.includes("officeapps.live.com")) {
+        return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(cleanUrl)}`;
+      }
+    }
+
+    return cleanUrl;
+  };
+
+  // Handler to add the user's custom presentation URL
+  const handleAddPresentationUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!urlInput.trim()) return;
+
+    const formatted = formatPresentationUrl(urlInput);
+    let displayTitle = urlNameInput.trim();
+    if (!displayTitle) {
+      try {
+        const parsed = new URL(urlInput);
+        displayTitle = `Canlı Sunum (${parsed.hostname.replace("www.", "")})`;
+      } catch {
+        displayTitle = "Canlı Web Sunumu";
+      }
+    }
+
+    const newId = "url_" + Date.now();
+    const newFile: UploadedFile = {
+      id: newId,
+      name: displayTitle,
+      size: "Canlı URL",
+      slideCount: 1,
+      uploadedAt: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+      presentationUrl: formatted
+    };
+
+    setUploadedFiles((prev) => [...prev, newFile]);
+    setActiveFileId(newId);
+    setCurrentSlide(0);
+
+    setUrlInput("");
+    setUrlNameInput("");
+    setUploadSuccessMsg(`🎉 Başarılı! "${displayTitle}" sunumu canlı canlandırıcı üzerinden bağlandı ve oynatıcıda açıldı.`);
+    setTimeout(() => setUploadSuccessMsg(null), 5000);
+  };
 
   // States for slide creation inputs
   const [newTitle, setNewTitle] = useState("");
@@ -516,6 +604,8 @@ export default function PresentationSection() {
     setTimeout(() => setUploadSuccessMsg(null), 4000);
   };
 
+  const activeFile = uploadedFiles.find((f) => f.id === activeFileId);
+  const isUrlPresentation = !!activeFile?.presentationUrl;
   const activeSlide = activeDeck[currentSlide] || activeDeck[0] || slides[0];
 
   return (
@@ -554,135 +644,200 @@ export default function PresentationSection() {
       {/* 2. Slide Carousel Deck */}
       <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl relative">
         {/* Color accent line */}
-        <div className={`h-1.5 bg-gradient-to-r ${activeSlide?.accentColor || "from-amber-500 to-red-650"} w-full transition-all duration-350`} />
+        <div className={`h-1.5 bg-gradient-to-r ${isUrlPresentation ? "from-amber-500 to-yellow-500" : (activeSlide?.accentColor || "from-amber-500 to-red-650")} w-full transition-all duration-350`} />
 
         <div className="p-6 md:p-8">
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-5 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-amber-500">
-                {activeSlide?.icon || <Presentation className="h-6 w-6" />}
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-500 uppercase font-mono tracking-widest block mb-0.5">
-                  SLAYT KONUSU {currentSlide + 1} / {activeDeck.length}
-                </span>
-                <h3 className="text-2xl font-black font-display text-white tracking-tight">
-                  {activeSlide?.title || "Başlık Atanmadı"}
-                </h3>
-              </div>
-            </div>
-
-            {/* Navigation Buttons + Full Screen trigger button */}
-            <div className="flex items-center flex-wrap gap-3">
-              <button
-                onClick={() => setIsFullScreen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold font-sans text-xs rounded-xl shadow-lg shadow-amber-500/15 transition-all"
-                title="Sunumu Tam Ekran Olarak Sitede Başlat"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-                Tam Ekran Oynat
-              </button>
-
-              <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-                <button
-                  onClick={handlePrev}
-                  className="p-2 bg-slate-950 hover:bg-slate-800 text-slate-350 rounded-lg transition-all"
-                  title="Geri Git"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                
-                <span className="text-xs font-mono font-bold px-3 text-slate-400 select-none">
-                  {currentSlide + 1} / {activeDeck.length}
-                </span>
-
-                <button
-                  onClick={handleNext}
-                  className="p-2 bg-slate-950 hover:bg-slate-800 text-slate-350 rounded-lg transition-all"
-                  title="İleri Git"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            {/* Left Column contents */}
-            <div className="lg:col-span-8 space-y-4">
-              {activeSlide?.subtitle && (
-                <p className="text-xs text-amber-400 uppercase font-mono font-bold tracking-wider">
-                  ✦ {activeSlide.subtitle}
-                </p>
-              )}
-
-              <div className="space-y-3 pt-1">
-                {activeSlide?.content.map((point, index) => (
-                  <div 
-                    key={index} 
-                    className="flex gap-3 bg-slate-900/45 border border-slate-900 p-4 rounded-xl hover:border-slate-800 transition-all hover:bg-slate-900/70"
-                  >
-                    <span className="h-5 w-5 flex items-center justify-center rounded bg-slate-950 font-mono font-black text-[10px] text-amber-500 shrink-0">
-                      0{index + 1}
+          {isUrlPresentation ? (
+            /* Live URL Embedded Presentation Mode */
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-amber-500 animate-pulse">
+                    <Presentation className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-amber-500 uppercase font-mono tracking-widest block mb-0.5">
+                      GÖMÜLÜ AKTİF SUNUM (CANLI URL)
                     </span>
-                    <p className="text-slate-350 text-sm leading-relaxed">{point}</p>
+                    <h3 className="text-2xl font-black font-display text-white tracking-tight">
+                      {activeFile?.name || "Canlı Sunum Dosyası"}
+                    </h3>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Right Column Metrics */}
-            <div className="lg:col-span-4 bg-slate-900/30 border border-slate-900 p-5 rounded-2xl space-y-5">
-              <div>
-                <span className="text-[#8E9299] font-mono text-[9px] uppercase tracking-wider block font-bold">
-                  Slayt Çözünürlük Dereceleri
-                </span>
-                <p className="text-[11px] text-slate-500 mt-0.5">Mühendislik ve operasyonel veriler</p>
+                <div className="flex items-center gap-2">
+                  {activeFile?.presentationUrl && (
+                    <a
+                      href={activeFile.presentationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-slate-950 hover:bg-slate-800 hover:text-white text-slate-350 font-bold text-xs rounded-xl border border-slate-850 transition-all"
+                    >
+                      Yeni Sekmede Aç
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setIsFullScreen(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-500/15 transition-all"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    Tam Ekran Oynat
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-2.5">
-                {activeSlide?.metrics?.map((metric, i) => (
-                  <div key={i} className="bg-slate-950/85 p-3 rounded-xl border border-slate-900 flex justify-between items-center text-xs">
-                    <span className="text-slate-400 font-sans">{metric.label}</span>
-                    <span className="font-extrabold text-white font-mono tracking-tight">{metric.value}</span>
+              {/* Responsive 16:9 Iframe Presenter */}
+              <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-800 bg-[#0B0D11] shadow-2xl">
+                {activeFile?.presentationUrl ? (
+                  <iframe
+                    src={activeFile.presentationUrl}
+                    className="absolute inset-0 w-full h-full border-0"
+                    title={activeFile.name}
+                    allowFullScreen
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-600 font-mono text-xs">
+                    Sunum URL adresi yüklenemedi.
                   </div>
-                ))}
-
-                {(!activeSlide?.metrics || activeSlide.metrics.length === 0) && (
-                  <span className="text-xs italic text-slate-600">Herhangi bir metrik tanımlanmadı.</span>
                 )}
               </div>
 
-              <div className="pt-4 border-t border-slate-900">
-                <button
-                  onClick={handleNext}
-                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5"
-                >
-                  Sonraki Başlığa Geç
-                  <ArrowRight className="h-3 w-3 text-amber-500" />
-                </button>
+              <div className="text-center text-[10px] text-slate-505 font-mono">
+                ✦ Slaytı kontrol etmek için doğrudan yukarıdaki sunum penceresine tıklayabilir veya klavyenizi kullanabilirsiniz.
               </div>
             </div>
+          ) : (
+            /* Traditional Text-based Slide Deck Mode */
+            <>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-5 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-amber-500">
+                    {activeSlide?.icon || <Presentation className="h-6 w-6" />}
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 uppercase font-mono tracking-widest block mb-0.5">
+                      SLAYT KONUSU {currentSlide + 1} / {activeDeck.length}
+                    </span>
+                    <h3 className="text-2xl font-black font-display text-white tracking-tight">
+                      {activeSlide?.title || "Başlık Atanmadı"}
+                    </h3>
+                  </div>
+                </div>
 
-          </div>
+                {/* Navigation Buttons + Full Screen trigger button */}
+                <div className="flex items-center flex-wrap gap-3">
+                  <button
+                    onClick={() => setIsFullScreen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold font-sans text-xs rounded-xl shadow-lg shadow-amber-500/15 transition-all"
+                    title="Sunumu Tam Ekran Olarak Sitede Başlat"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    Tam Ekran Oynat
+                  </button>
+
+                  <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+                    <button
+                      onClick={handlePrev}
+                      className="p-2 bg-slate-950 hover:bg-slate-800 text-slate-350 rounded-lg transition-all"
+                      title="Geri Git"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    
+                    <span className="text-xs font-mono font-bold px-3 text-slate-400 select-none">
+                      {currentSlide + 1} / {activeDeck.length}
+                    </span>
+
+                    <button
+                      onClick={handleNext}
+                      className="p-2 bg-slate-950 hover:bg-slate-800 text-slate-350 rounded-lg transition-all"
+                      title="İleri Git"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* Left Column contents */}
+                <div className="lg:col-span-8 space-y-4">
+                  {activeSlide?.subtitle && (
+                    <p className="text-xs text-amber-400 uppercase font-mono font-bold tracking-wider">
+                      ✦ {activeSlide.subtitle}
+                    </p>
+                  )}
+
+                  <div className="space-y-3 pt-1">
+                    {activeSlide?.content.map((point, index) => (
+                      <div 
+                        key={index} 
+                        className="flex gap-3 bg-slate-900/45 border border-slate-900 p-4 rounded-xl hover:border-slate-800 transition-all hover:bg-slate-900/70"
+                      >
+                        <span className="h-5 w-5 flex items-center justify-center rounded bg-slate-950 font-mono font-black text-[10px] text-amber-500 shrink-0">
+                          0{index + 1}
+                        </span>
+                        <p className="text-slate-350 text-sm leading-relaxed">{point}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Column Metrics */}
+                <div className="lg:col-span-4 bg-slate-900/30 border border-slate-900 p-5 rounded-2xl space-y-5">
+                  <div>
+                    <span className="text-[#8E9299] font-mono text-[9px] uppercase tracking-wider block font-bold">
+                      Slayt Çözünürlük Dereceleri
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Mühendislik ve operasyonel veriler</p>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {activeSlide?.metrics?.map((metric, i) => (
+                      <div key={i} className="bg-slate-950/85 p-3 rounded-xl border border-slate-900 flex justify-between items-center text-xs">
+                        <span className="text-slate-400 font-sans">{metric.label}</span>
+                        <span className="font-extrabold text-white font-mono tracking-tight">{metric.value}</span>
+                      </div>
+                    ))}
+
+                    {(!activeSlide?.metrics || activeSlide.metrics.length === 0) && (
+                      <span className="text-xs italic text-slate-600">Herhangi bir metrik tanımlanmadı.</span>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-900">
+                    <button
+                      onClick={handleNext}
+                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5"
+                    >
+                      Sonraki Başlığa Geç
+                      <ArrowRight className="h-3 w-3 text-amber-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
         </div>
 
         {/* Slide pagination page dots */}
-        <div className="flex justify-center gap-1 px-6 pb-6 bg-slate-950/25 border-t border-slate-950">
-          {activeDeck.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentSlide(i)}
-              className={`h-1.5 rounded-full transition-all ${
-                currentSlide === i ? "w-8 bg-amber-500" : "w-1.5 bg-slate-800 hover:bg-slate-700"
-              }`}
-              title={`Slayt ${i + 1}`}
-            />
-          ))}
-        </div>
+        {!isUrlPresentation && (
+          <div className="flex justify-center gap-1 px-6 pb-6 bg-slate-950/25 border-t border-slate-950">
+            {activeDeck.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentSlide(i)}
+                className={`h-1.5 rounded-full transition-all ${
+                  currentSlide === i ? "w-8 bg-amber-500" : "w-1.5 bg-slate-800 hover:bg-slate-700"
+                }`}
+                title={`Slayt ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Dynamic Success alerts */}
@@ -775,6 +930,39 @@ export default function PresentationSection() {
               </button>
             </div>
           </div>
+
+          {/* Live Web Link Presenter URL Form */}
+          <form onSubmit={handleAddPresentationUrl} className="mt-5 pt-4 border-t border-slate-900 space-y-2.5">
+            <span className="text-[10px] text-amber-500 uppercase tracking-widest font-mono block font-black">
+              🔮 SUNUMU URL BAĞLANTISI İLE YÜKLE (GÖMÜLÜ OYNATICI)
+            </span>
+            <p className="text-[10.5px] text-slate-500 font-sans leading-relaxed">
+              Google Slides, Canva veya online PowerPoint sunum bağlantınızı girin. Sistem sunumunuzu tam aslıyla, tüm şablon ve sayfa görselleriyle sisteme bağlayacaktır.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={urlNameInput}
+                onChange={(e) => setUrlNameInput(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-850 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+                placeholder="Örn: AFAD 2026 Kriz Planı"
+              />
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                className="flex-[2] bg-slate-950 border border-slate-850 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-amber-500 font-mono"
+                placeholder="Google Slides / Web Sunum Linki"
+                required
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-lg transition-all shadow-md shadow-amber-500/10 shrink-0"
+              >
+                Yükle & Aç
+              </button>
+            </div>
+          </form>
         </div>
 
         {/* Loaded / Uploaded Files Archive List (Right Column) */}
@@ -988,20 +1176,24 @@ export default function PresentationSection() {
           <div className="flex items-center justify-between border-b border-slate-900 pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500 border border-amber-500/10">
-                <Presentation className="h-5 w-5" />
+                <Presentation className="h-5 w-5 animate-pulse" />
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 font-mono block uppercase tracking-wider">GÖSTERİLEN DOSYA</span>
+                <span className="text-[10px] text-slate-500 font-mono block uppercase tracking-wider">
+                  {isUrlPresentation ? "CANLI GÖMÜLÜ SUNUM" : "GÖSTERİLEN DOSYA"}
+                </span>
                 <h2 className="text-sm font-bold text-slate-200">
-                  {uploadedFiles.find(f => f.id === activeFileId)?.name || "fireguard_pro_ana_sunum.json"}
+                  {activeFile?.name || "fireguard_pro_ana_sunum.json"}
                 </h2>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <span className="px-3 py-1 bg-slate-900 rounded-full text-xs font-mono font-bold text-amber-500 border border-slate-800">
-                {currentSlide + 1} / {activeDeck.length}
-              </span>
+              {!isUrlPresentation && (
+                <span className="px-3 py-1 bg-slate-900 rounded-full text-xs font-mono font-bold text-amber-500 border border-slate-800">
+                  {currentSlide + 1} / {activeDeck.length}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => setIsFullScreen(false)}
@@ -1015,88 +1207,122 @@ export default function PresentationSection() {
           </div>
 
           {/* Main Slide Stage */}
-          <div className="flex-1 my-8 max-w-5xl mx-auto w-full flex flex-col justify-center space-y-6">
-            <div className="space-y-2 text-center md:text-left">
-              {activeSlide?.subtitle && (
-                <span className="text-xs font-black uppercase tracking-widest text-[#FF9E2C] font-mono block">
-                  ✦ {activeSlide.subtitle}
-                </span>
-              )}
-              <h1 className="text-3xl md:text-5xl font-black font-display tracking-tight leading-tight text-white">
-                {activeSlide?.title}
-              </h1>
-              <div className={`h-1 w-24 bg-gradient-to-r ${activeSlide?.accentColor || "from-amber-500 to-red-650"} rounded-full mt-3`} />
-            </div>
-
-            {/* Bullet Points */}
-            <div className="grid grid-cols-1 gap-4 pt-4">
-              {activeSlide?.content.map((point, index) => (
-                <div 
-                  key={index}
-                  className="p-5 md:p-6 bg-slate-900/60 border border-slate-850 rounded-2xl flex gap-4 hover:border-amber-500/20 hover:bg-slate-900/80 transition-all items-start"
-                >
-                  <span className="h-8 w-8 rounded-full bg-amber-500 text-slate-950 font-black text-xs font-mono flex items-center justify-center shrink-0 shadow-md">
-                    0{index + 1}
-                  </span>
-                  <p className="text-base md:text-lg text-slate-300 leading-relaxed font-sans">{point}</p>
+          <div className="flex-1 my-6 w-full flex flex-col justify-center">
+            {isUrlPresentation ? (
+              /* Fullscreen IFrame rendering */
+              <div className="w-full h-[76vh] relative rounded-2xl overflow-hidden border border-slate-800 bg-[#07090C] shadow-2xl">
+                {activeFile?.presentationUrl ? (
+                  <iframe
+                    src={activeFile.presentationUrl}
+                    className="absolute inset-0 w-full h-full border-0"
+                    title={activeFile.name}
+                    allowFullScreen
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-500 font-mono text-xs">
+                    Sunum URL adresi bulunmuyor.
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Standard slide graphics rendering */
+              <div className="max-w-5xl mx-auto w-full flex flex-col justify-center space-y-6">
+                <div className="space-y-2 text-center md:text-left">
+                  {activeSlide?.subtitle && (
+                    <span className="text-xs font-black uppercase tracking-widest text-[#FF9E2C] font-mono block">
+                      ✦ {activeSlide.subtitle}
+                    </span>
+                  )}
+                  <h1 className="text-3xl md:text-5xl font-black font-display tracking-tight leading-tight text-white">
+                    {activeSlide?.title}
+                  </h1>
+                  <div className={`h-1 w-24 bg-gradient-to-r ${activeSlide?.accentColor || "from-amber-500 to-red-650"} rounded-full mt-3`} />
                 </div>
-              ))}
-            </div>
 
-            {/* Slide Metrics Row */}
-            {activeSlide?.metrics && activeSlide.metrics.length > 0 && (
-               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-4">
-                 {activeSlide.metrics.map((metric, i) => (
-                   <div key={i} className="p-3 bg-slate-950/80 border border-slate-900 rounded-xl flex justify-between items-center text-xs">
-                     <span className="text-slate-500 font-sans">{metric.label}</span>
-                     <span className="font-extrabold text-[#FF9232] font-mono">{metric.value}</span>
-                   </div>
-                 ))}
-               </div>
-             )}
+                {/* Bullet Points */}
+                <div className="grid grid-cols-1 gap-4 pt-4">
+                  {activeSlide?.content.map((point, index) => (
+                    <div 
+                      key={index}
+                      className="p-5 md:p-6 bg-slate-900/60 border border-slate-850 rounded-2xl flex gap-4 hover:border-amber-500/20 hover:bg-slate-900/80 transition-all items-start"
+                    >
+                      <span className="h-8 w-8 rounded-full bg-amber-500 text-slate-950 font-black text-xs font-mono flex items-center justify-center shrink-0 shadow-md">
+                        0{index + 1}
+                      </span>
+                      <p className="text-base md:text-lg text-slate-300 leading-relaxed font-sans">{point}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Slide Metrics Row */}
+                {activeSlide?.metrics && activeSlide.metrics.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-4">
+                    {activeSlide.metrics.map((metric, i) => (
+                      <div key={i} className="p-3 bg-slate-950/80 border border-slate-900 rounded-xl flex justify-between items-center text-xs">
+                        <span className="text-slate-500 font-sans">{metric.label}</span>
+                        <span className="font-extrabold text-[#FF9232] font-mono">{metric.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bottom Bar with controls, tips and progress bar */}
           <div className="space-y-4">
-            {/* Progress Bar */}
-            <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
-              <div 
-                className={`h-full bg-gradient-to-r ${activeSlide?.accentColor || "from-amber-500 to-red-650"} transition-all duration-300`}
-                style={{ width: `${((currentSlide + 1) / activeDeck.length) * 100}%` }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span className="font-mono hidden md:inline">
-                Navigasyon: Klavye ◄ / ► / Boşluk Tuşları ile geçiş yapın | ESC ile kapatın
-              </span>
-              <span className="font-mono md:hidden">
-                Ekranı kaydırarak veya aşağıdaki yön tuşlarını kullanarak ilerleyin
-              </span>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handlePrev}
-                  className="p-3 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl border border-slate-850 transition-all"
-                  title="Önceki Slayt"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-
-                <span className="text-sm font-mono font-bold text-slate-400 min-w-[50px] text-center select-none">
-                  {currentSlide + 1} / {activeDeck.length}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="p-3 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl border border-slate-850 transition-all"
-                  title="Sonraki Slayt"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </button>
+            {/* Progress Bar (only for traditional slides) */}
+            {!isUrlPresentation && (
+              <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full bg-gradient-to-r ${activeSlide?.accentColor || "from-amber-500 to-red-650"} transition-all duration-300`}
+                  style={{ width: `${((currentSlide + 1) / activeDeck.length) * 100}%` }}
+                />
               </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs text-slate-540">
+              {isUrlPresentation ? (
+                <span className="font-mono text-slate-500">
+                  Bilgi: Canlı sunumunuzu kontrol etmek için penceredeki nesnelerle doğrudan etkileşime geçebilirsiniz. ESC tuşuyla kapatın.
+                </span>
+              ) : (
+                <>
+                  <span className="font-mono hidden md:inline">
+                    Navigasyon: Klavye ◄ / ► / Boşluk Tuşları ile geçiş yapın | ESC ile kapatın
+                  </span>
+                  <span className="font-mono md:hidden">
+                    Ekranı kaydırarak veya aşağıdaki yön tuşlarını kullanarak ilerleyin
+                  </span>
+                </>
+              )}
+
+              {!isUrlPresentation && (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrev}
+                    className="p-3 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl border border-slate-850 transition-all"
+                    title="Önceki Slayt"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+
+                  <span className="text-sm font-mono font-bold text-slate-400 min-w-[50px] text-center select-none">
+                    {currentSlide + 1} / {activeDeck.length}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="p-3 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl border border-slate-850 transition-all"
+                    title="Sonraki Slayt"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
