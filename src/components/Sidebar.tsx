@@ -1,9 +1,9 @@
 import React from "react";
-import { Compass, Users, BookOpen, Flame, Activity } from "lucide-react";
+import { Compass, Users, BookOpen, Flame, Activity, Presentation } from "lucide-react";
 
 interface SidebarProps {
-  activeTab: "home" | "team" | "sources";
-  onTabChange: (tab: "home" | "team" | "sources") => void;
+  activeTab: "home" | "team" | "sources" | "presentation";
+  onTabChange: (tab: "home" | "team" | "sources" | "presentation") => void;
   activeFiresCount: number;
 }
 
@@ -54,6 +54,18 @@ export default function Sidebar({ activeTab, onTabChange, activeFiresCount }: Si
         >
           <Users className="h-5 w-5 opacity-80" />
           <span className="text-sm font-semibold font-sans">Kişiler ve Görevler</span>
+        </button>
+
+        <button
+          onClick={() => onTabChange("presentation")}
+          className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+            activeTab === "presentation"
+              ? "bg-[#1A1D23] text-white border-l-4 border-red-500"
+              : "text-[#8E9299] hover:bg-[#1A1D23]/60 hover:text-white"
+          }`}
+        >
+          <Presentation className="h-5 w-5 opacity-80" />
+          <span className="text-sm font-semibold font-sans">Sunum / Slaytlar</span>
         </button>
 
         <button

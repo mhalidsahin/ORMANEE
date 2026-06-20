@@ -10,13 +10,14 @@ import HistorySection from "./components/HistorySection";
 import TeamMembersSection from "./components/TeamMembersSection";
 import BibliographySection from "./components/BibliographySection";
 import AnalysisTools from "./components/AnalysisTools";
+import PresentationSection from "./components/PresentationSection";
 
 import { EcoRegionId, GridCell, ActiveFire, Watchtower, WaterSource, SuppressionTeam, FireBarrier, IncidentReport } from "./types";
 import { ECO_REGIONS, generateInitialGrid, INITIAL_FIRES, INITIAL_TOWERS, WATER_SOURCES, INITIAL_TEAMS } from "./data/mockData";
 import { TreePine, Waves, Thermometer, ShieldAlert, Cpu, Heart, Moon } from "lucide-react";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "team" | "sources">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "team" | "sources" | "presentation">("home");
   const [ecoRegionId, setEcoRegionId] = useState<EcoRegionId>("cascade_ridge");
   
   // Real dynamic Grid cells
@@ -536,6 +537,13 @@ export default function App() {
 
         {/* Tab ki kaynakça render view */}
         {activeTab === "sources" && <BibliographySection />}
+
+        {/* Tab ki Sunum render view */}
+        {activeTab === "presentation" && (
+          <div className="flex-1 p-6 space-y-6 max-w-7xl mx-auto w-full">
+            <PresentationSection />
+          </div>
+        )}
 
       </main>
 
